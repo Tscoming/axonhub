@@ -3,7 +3,10 @@ package orchestrator
 import (
 	"context"
 	"os"
+	"slices"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/samber/lo"
@@ -120,7 +123,21 @@ type LoadBalancer struct {
 	selectionTracker       ChannelSelectionTracker
 	weightTieBreaker       bool
 	roundRobinHealthFilter *RoundRobinHealthStrategy
+	strictRoundRobin       bool
+	roundRobinMu           sync.Mutex
+	roundRobinCursors      map[string]uint64
 	debug                  bool
+}
+
+// WithStrictRoundRobin rotates healthy candidates independently for each
+// logical model and priority group. Scoring still determines hard
+// unavailability, but historical request counts cannot collapse the order to a
+// permanent tie.
+func (lb *LoadBalancer) WithStrictRoundRobin() *LoadBalancer {
+	lb.strictRoundRobin = true
+	lb.roundRobinCursors = make(map[string]uint64)
+
+	return lb
 }
 
 // NewLoadBalancer creates a new load balancer with the given strategies.
@@ -206,7 +223,7 @@ func (lb *LoadBalancer) sort(
 	}
 
 	// Production path - minimal overhead
-	return lb.sortProduction(ctx, candidates, topK, trackSelection)
+	return lb.sortProduction(ctx, candidates, model, topK, trackSelection)
 }
 
 // sortProduction is the fast path without debug overhead.
@@ -214,6 +231,7 @@ func (lb *LoadBalancer) sort(
 func (lb *LoadBalancer) sortProduction(
 	ctx context.Context,
 	candidates []*ChannelModelsCandidate,
+	model string,
 	topK int,
 	trackSelection bool,
 ) []*ChannelModelsCandidate {
@@ -233,7 +251,7 @@ func (lb *LoadBalancer) sortProduction(
 	}
 
 	sortK := topK
-	if lb.roundRobinHealthFilter != nil {
+	if lb.roundRobinHealthFilter != nil || lb.strictRoundRobin {
 		sortK = len(scored)
 	}
 
@@ -271,6 +289,9 @@ func (lb *LoadBalancer) sortProduction(
 	if lb.roundRobinHealthFilter != nil {
 		selected = lb.prioritizeHealthyRoundRobinScores(ctx, selected)
 	}
+	if lb.strictRoundRobin {
+		selected = lb.rotateHealthyRoundRobinScores(ctx, model, selected, trackSelection)
+	}
 	if len(selected) > topK {
 		selected = selected[:topK]
 	}
@@ -285,6 +306,64 @@ func (lb *LoadBalancer) sortProduction(
 	}
 
 	return result
+}
+
+func (lb *LoadBalancer) rotateHealthyRoundRobinScores(
+	ctx context.Context,
+	model string,
+	scored []candidateScore,
+	advance bool,
+) []candidateScore {
+	healthyCount := 0
+	for _, score := range scored {
+		if isHardUnavailableScore(score.score) ||
+			(lb.roundRobinHealthFilter != nil && score.candidate != nil && score.candidate.Channel != nil &&
+				lb.roundRobinHealthFilter.IsUnhealthy(ctx, score.candidate.Channel)) {
+			break
+		}
+		healthyCount++
+	}
+	if healthyCount <= 1 {
+		return scored
+	}
+
+	offset := lb.nextRoundRobinOffset(model, scored[:healthyCount], advance)
+	rotated := make([]candidateScore, 0, len(scored))
+	rotated = append(rotated, scored[offset:healthyCount]...)
+	rotated = append(rotated, scored[:offset]...)
+	return append(rotated, scored[healthyCount:]...)
+}
+
+func (lb *LoadBalancer) nextRoundRobinOffset(model string, scored []candidateScore, advance bool) int {
+	ids := make([]int, 0, len(scored))
+	priority := 0
+	for _, score := range scored {
+		if score.candidate == nil || score.candidate.Channel == nil {
+			continue
+		}
+		ids = append(ids, score.candidate.Channel.ID)
+		priority = score.candidate.Priority
+	}
+	slices.Sort(ids)
+
+	var key strings.Builder
+	key.WriteString(model)
+	key.WriteByte('|')
+	key.WriteString(strconv.Itoa(priority))
+	for _, id := range ids {
+		key.WriteByte('|')
+		key.WriteString(strconv.Itoa(id))
+	}
+
+	lb.roundRobinMu.Lock()
+	defer lb.roundRobinMu.Unlock()
+
+	cursor := lb.roundRobinCursors[key.String()]
+	if advance {
+		lb.roundRobinCursors[key.String()] = cursor + 1
+	}
+
+	return int(cursor % uint64(len(scored)))
 }
 
 func (lb *LoadBalancer) prioritizeHealthyRoundRobinScores(ctx context.Context, scored []candidateScore) []candidateScore {
@@ -358,7 +437,7 @@ func (lb *LoadBalancer) sortWithDebug(
 	// When scores are equal, use OrderingWeight as tie-breaker (higher weight = higher priority)
 	// Do NOT use channel ID as tie-breaker to avoid deterministic ordering that causes uneven distribution
 	sortK := topK
-	if lb.roundRobinHealthFilter != nil {
+	if lb.roundRobinHealthFilter != nil || lb.strictRoundRobin {
 		sortK = len(decisions)
 	}
 
@@ -391,6 +470,26 @@ func (lb *LoadBalancer) sortWithDebug(
 	selected := decisions[:sortK]
 	if lb.roundRobinHealthFilter != nil {
 		selected = lb.prioritizeHealthyRoundRobinDecisions(ctx, selected)
+	}
+	if lb.strictRoundRobin {
+		scored := make([]candidateScore, 0, len(selected))
+		for _, decision := range selected {
+			for _, candidate := range candidates {
+				if candidate.Channel.ID == decision.Channel.ID {
+					scored = append(scored, candidateScore{candidate: candidate, score: decision.TotalScore})
+					break
+				}
+			}
+		}
+		rotated := lb.rotateHealthyRoundRobinScores(ctx, model, scored, trackSelection)
+		byID := make(map[int]ChannelDecision, len(selected))
+		for _, decision := range selected {
+			byID[decision.Channel.ID] = decision
+		}
+		selected = selected[:0]
+		for _, score := range rotated {
+			selected = append(selected, byID[score.candidate.Channel.ID])
+		}
 	}
 	if len(selected) > topK {
 		selected = selected[:topK]

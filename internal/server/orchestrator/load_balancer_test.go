@@ -116,6 +116,55 @@ func TestLoadBalancer_Sort_WithoutWeightTieBreaker_PreservesInputOrderWhenScores
 	assert.Equal(t, 3, result[2].Channel.ID)
 }
 
+func TestLoadBalancer_Sort_StrictRoundRobinPerModel(t *testing.T) {
+	ctx := context.Background()
+	lb := newTestLoadBalancer(t, &biz.RetryPolicy{Enabled: true, MaxChannelRetries: 2}).
+		WithoutWeightTieBreaker().
+		WithStrictRoundRobin()
+
+	candidates := []*ChannelModelsCandidate{
+		{Channel: &biz.Channel{Channel: &ent.Channel{ID: 1, Name: "ch1"}}, Priority: 0},
+		{Channel: &biz.Channel{Channel: &ent.Channel{ID: 2, Name: "ch2"}}, Priority: 0},
+		{Channel: &biz.Channel{Channel: &ent.Channel{ID: 3, Name: "ch3"}}, Priority: 0},
+	}
+
+	assert.Equal(t, 1, lb.Sort(ctx, candidates, "model-a", false)[0].Channel.ID)
+	assert.Equal(t, 2, lb.Sort(ctx, candidates, "model-a", false)[0].Channel.ID)
+	assert.Equal(t, 3, lb.Sort(ctx, candidates, "model-a", false)[0].Channel.ID)
+	assert.Equal(t, 1, lb.Sort(ctx, candidates, "model-b", false)[0].Channel.ID)
+	assert.Equal(t, 1, lb.Sort(ctx, candidates, "model-a", false)[0].Channel.ID)
+}
+
+func TestLoadBalancer_Sort_StrictRoundRobinSkipsUnhealthy(t *testing.T) {
+	ctx := context.Background()
+	recentFailure := time.Now().Add(-time.Minute)
+	unhealthy := &biz.AggregatedMetrics{}
+	unhealthy.ConsecutiveFailures = roundRobinFailureThreshold
+	unhealthy.LastFailureAt = &recentFailure
+	metricsProvider := &mockMetricsProvider{metrics: map[int]*biz.AggregatedMetrics{
+		1: {},
+		2: unhealthy,
+		3: {},
+	}}
+	lb := newTestLoadBalancer(t, &biz.RetryPolicy{Enabled: true, MaxChannelRetries: 2}).
+		WithoutWeightTieBreaker().
+		WithRoundRobinHealthFilter(NewRoundRobinHealthStrategy(metricsProvider)).
+		WithStrictRoundRobin()
+
+	candidates := []*ChannelModelsCandidate{
+		{Channel: &biz.Channel{Channel: &ent.Channel{ID: 1, Name: "healthy-1"}}, Priority: 0},
+		{Channel: &biz.Channel{Channel: &ent.Channel{ID: 2, Name: "unhealthy"}}, Priority: 0},
+		{Channel: &biz.Channel{Channel: &ent.Channel{ID: 3, Name: "healthy-3"}}, Priority: 0},
+	}
+
+	first := lb.Sort(ctx, candidates, "model-a", false)
+	second := lb.Sort(ctx, candidates, "model-a", false)
+	require.Len(t, first, 3)
+	require.Len(t, second, 3)
+	assert.Equal(t, []int{1, 3, 2}, []int{first[0].Channel.ID, first[1].Channel.ID, first[2].Channel.ID})
+	assert.Equal(t, []int{3, 1, 2}, []int{second[0].Channel.ID, second[1].Channel.ID, second[2].Channel.ID})
+}
+
 func TestLoadBalancer_Sort_RoundRobinHealthMovesUnhealthyChannelsLast(t *testing.T) {
 	ctx := context.Background()
 	recentFailure := time.Now().Add(-time.Minute)

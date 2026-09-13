@@ -170,6 +170,7 @@ func (processor *TestChannelOrchestrator) TestChannel(
 		adaptiveLoadBalancer:       processor.loadBalancer,
 		failoverLoadBalancer:       processor.loadBalancer,
 		circuitBreakerLoadBalancer: processor.loadBalancer,
+		roundRobinLoadBalancer:     processor.loadBalancer,
 		channelLimiterManager:      processor.channelLimiterManager,
 		modelCircuitBreaker:        processor.modelCircuitBreaker,
 	}

@@ -168,4 +168,5 @@ config.schema.json
 .playwright-mcp/
 .ace-tool/
 .omx/
+.understand-anything/
 deploy_dev.sh

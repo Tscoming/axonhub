@@ -2,10 +2,12 @@ package biz
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 
-	"entgo.io/ent/dialect/sql"
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 
 	"github.com/looplj/axonhub/internal/authz"
@@ -37,8 +39,8 @@ func (m *quotaRoutingMigrator) migrateInTransaction(ctx context.Context) error {
 	if err := m.system.entFromContext(ctx).System.Create().
 		SetKey(SystemKeyQuotaRoutingMigrationDone).
 		SetValue(claim).
-		OnConflict(sql.ResolveWithIgnore()).
-		Exec(ctx); err != nil {
+		OnConflict(entsql.DoNothing()).
+		Exec(ctx); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("failed to claim quota routing migration: %w", err)
 	}
 	marker, err := m.system.entFromContext(ctx).System.Query().

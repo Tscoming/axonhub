@@ -64,9 +64,8 @@ func NewChatCompletionOrchestrator(
 
 	roundRobinHealthFilter := NewRoundRobinHealthStrategy(channelService)
 	roundRobinLoadBalancer := NewLoadBalancer(systemService, channelService,
-		NewRoundRobinStrategy(channelService),
 		rateLimitStrategy,
-	).WithoutWeightTieBreaker().WithRoundRobinHealthFilter(roundRobinHealthFilter)
+	).WithoutWeightTieBreaker().WithRoundRobinHealthFilter(roundRobinHealthFilter).WithStrictRoundRobin()
 
 	return &ChatCompletionOrchestrator{
 		Inbound:            inbound,

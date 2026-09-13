@@ -47,13 +47,13 @@ type channelMetrics struct {
 }
 
 // loadChannelPerformances loads channel performance metrics from request_execution table.
-// It queries the last 6 hours of data to initialize in-memory metrics for load balancing.
+// It uses the same window as the in-memory tracker so a restart does not give
+// historical requests a longer influence than requests observed at runtime.
 // Uses a single GROUP BY query to fetch all channel metrics at once for better performance.
 func (svc *ChannelService) loadChannelPerformances(ctx context.Context) error {
 	client := svc.entFromContext(ctx)
 
-	// Query last 6 hours of request execution data
-	since := xtime.UTCNow().Add(-6 * time.Hour)
+	since := xtime.UTCNow().Add(-defaultPerformanceWindowSize * time.Second)
 
 	// Fetch all channel metrics in a single GROUP BY query
 	metrics, err := svc.loadAllChannelMetricsFromExecutions(ctx, client, since)
