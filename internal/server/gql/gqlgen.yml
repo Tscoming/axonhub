@@ -223,6 +223,12 @@ models:
   UpdateRetryPolicyInput:
     model:
       - github.com/looplj/axonhub/internal/server/biz.RetryPolicy
+  ModelFailoverPolicy:
+    model:
+      - github.com/looplj/axonhub/internal/server/biz.ModelFailoverPolicy
+  ModelFailoverPolicyInput:
+    model:
+      - github.com/looplj/axonhub/internal/server/biz.ModelFailoverPolicy
   WebhookNotifierConfig:
     model:
       - github.com/looplj/axonhub/internal/server/biz.WebhookNotifierConfig

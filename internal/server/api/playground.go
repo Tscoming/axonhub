@@ -133,6 +133,20 @@ func (handlers *PlaygroundHandlers) HandleError(rawErr error) *PlaygroundRespons
 		}
 	}
 
+	var unavailableErr *orchestrator.NoAvailableChannelError
+	if errors.As(rawErr, &unavailableErr) {
+		return &PlaygroundResponseError{
+			Status: http.StatusServiceUnavailable,
+			Error: struct {
+				Code    int    `json:"code,omitempty"`
+				Message string `json:"message"`
+			}{
+				Code:    http.StatusServiceUnavailable,
+				Message: unavailableErr.Error(),
+			},
+		}
+	}
+
 	if httpErr, ok := xerrors.As[*httpclient.Error](rawErr); ok {
 		// Prefer upstream error message when available
 		msg := tryExtractUpstreamErrorMessage(httpErr.Body)

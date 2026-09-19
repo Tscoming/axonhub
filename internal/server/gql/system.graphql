@@ -130,6 +130,38 @@ type RetryPolicy {
   autoDisableChannel: AutoDisableChannel!
   emptyResponseDetection: Boolean!
   upstreamErrorPolicy: UpstreamErrorPolicy!
+  modelFailover: ModelFailoverPolicy!
+}
+
+type ModelFailoverPolicy {
+  enabled: Boolean!
+  halfOpenThreshold: Int!
+  openThreshold: Int!
+  failureStatsTTLSeconds: Int!
+  probeIntervalSeconds: Int!
+  halfOpenWeight: Float!
+  reserveFallbackPriorities: Int!
+}
+
+type ModelFailoverRuntimeStatus {
+  channelID: Int!
+  channelName: String!
+  modelID: String!
+  state: String!
+  consecutiveFailures: Int!
+  lastFailureAt: Time
+  lastSuccessAt: Time
+  nextProbeAt: Time
+}
+
+input ModelFailoverPolicyInput {
+  enabled: Boolean
+  halfOpenThreshold: Int
+  openThreshold: Int
+  failureStatsTTLSeconds: Int
+  probeIntervalSeconds: Int
+  halfOpenWeight: Float
+  reserveFallbackPriorities: Int
 }
 
 type UpstreamErrorPolicy {
@@ -164,6 +196,7 @@ input UpdateRetryPolicyInput {
   autoDisableChannel: AutoDisableChannelInput
   emptyResponseDetection: Boolean
   upstreamErrorPolicy: UpstreamErrorPolicyInput
+  modelFailover: ModelFailoverPolicyInput
 }
 
 enum TraceStickyMode {
@@ -495,6 +528,7 @@ extend type Query {
   brandSettings: BrandSettings!
   storagePolicy: StoragePolicy!
   retryPolicy: RetryPolicy!
+  modelFailoverStatuses: [ModelFailoverRuntimeStatus!]!
   webhookNotifierConfig: WebhookNotifierConfig!
   systemModelSettings: SystemModelSettings!
   defaultDataStorageID: ID

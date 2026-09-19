@@ -345,6 +345,17 @@ type LoadAPIKeyProfileTemplateInput struct {
 	APIKeyID   objects.GUID `json:"apiKeyID"`
 }
 
+type ModelFailoverRuntimeStatus struct {
+	ChannelID           int        `json:"channelID"`
+	ChannelName         string     `json:"channelName"`
+	ModelID             string     `json:"modelID"`
+	State               string     `json:"state"`
+	ConsecutiveFailures int        `json:"consecutiveFailures"`
+	LastFailureAt       *time.Time `json:"lastFailureAt,omitempty"`
+	LastSuccessAt       *time.Time `json:"lastSuccessAt,omitempty"`
+	NextProbeAt         *time.Time `json:"nextProbeAt,omitempty"`
+}
+
 // Performance statistics for a specific model on a given date
 type ModelPerformanceStat struct {
 	Date         string   `json:"date"`

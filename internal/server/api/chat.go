@@ -22,8 +22,10 @@ import (
 )
 
 const (
-	errTypeQuotaExhausted = "quota_exhausted"
-	errCodeQuotaExhausted = "quota_exhausted"
+	errTypeQuotaExhausted     = "quota_exhausted"
+	errCodeQuotaExhausted     = "quota_exhausted"
+	errTypeNoAvailableChannel = "no_available_channel"
+	errCodeNoAvailableChannel = "no_available_channel"
 )
 
 // StreamWriter is a function type for writing stream events to the response.
@@ -648,6 +650,10 @@ func streamErrorStatus(err error) int {
 	if errors.As(err, &quotaErr) {
 		return http.StatusServiceUnavailable
 	}
+	var unavailableErr *orchestrator.NoAvailableChannelError
+	if errors.As(err, &unavailableErr) {
+		return http.StatusServiceUnavailable
+	}
 
 	var respErr *llm.ResponseError
 	if errors.As(err, &respErr) && respErr.StatusCode != 0 {
@@ -677,6 +683,17 @@ func FormatStreamError(ctx context.Context, err error) any {
 				"message": quotaErr.Error(),
 				"type":    errTypeQuotaExhausted,
 				"code":    errCodeQuotaExhausted,
+			},
+		}
+	}
+
+	var unavailableErr *orchestrator.NoAvailableChannelError
+	if errors.As(err, &unavailableErr) {
+		return gin.H{
+			"error": gin.H{
+				"message": unavailableErr.Error(),
+				"type":    errTypeNoAvailableChannel,
+				"code":    errCodeNoAvailableChannel,
 			},
 		}
 	}
@@ -752,6 +769,18 @@ func wrapQuotaExhaustedAsResponseError(err error) error {
 				Message: quotaErr.Error(),
 				Type:    errTypeQuotaExhausted,
 				Code:    errCodeQuotaExhausted,
+			},
+		}
+	}
+
+	var unavailableErr *orchestrator.NoAvailableChannelError
+	if errors.As(err, &unavailableErr) {
+		return &llm.ResponseError{
+			StatusCode: http.StatusServiceUnavailable,
+			Detail: llm.ErrorDetail{
+				Message: unavailableErr.Error(),
+				Type:    errTypeNoAvailableChannel,
+				Code:    errCodeNoAvailableChannel,
 			},
 		}
 	}

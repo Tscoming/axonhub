@@ -41,6 +41,10 @@ func applyUpstreamErrorPolicy(ctx context.Context, err error, systemService *biz
 	if errors.As(err, &quotaErr) {
 		return err
 	}
+	var unavailableErr *orchestrator.NoAvailableChannelError
+	if errors.As(err, &unavailableErr) {
+		return err
+	}
 
 	policy := systemService.RetryPolicyOrDefault(ctx).UpstreamErrorPolicy
 	if policy.Mode == biz.UpstreamErrorModePassthrough || policy.Mode == "" {
@@ -61,7 +65,8 @@ func applyUpstreamErrorPolicy(ctx context.Context, err error, systemService *biz
 
 	var respErr *llm.ResponseError
 	if errors.As(err, &respErr) {
-		if respErr.Detail.Code == errCodeQuotaExhausted || respErr.Detail.Type == errTypeQuotaExhausted {
+		if respErr.Detail.Code == errCodeQuotaExhausted || respErr.Detail.Type == errTypeQuotaExhausted ||
+			respErr.Detail.Code == errCodeNoAvailableChannel || respErr.Detail.Type == errTypeNoAvailableChannel {
 			return err
 		}
 

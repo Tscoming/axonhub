@@ -8,6 +8,7 @@ package gql
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/looplj/axonhub/internal/authz"
@@ -519,6 +520,55 @@ func (r *queryResolver) StoragePolicy(ctx context.Context) (*biz.StoragePolicy, 
 // RetryPolicy is the resolver for the retryPolicy field.
 func (r *queryResolver) RetryPolicy(ctx context.Context) (*biz.RetryPolicy, error) {
 	return r.systemService.RetryPolicy(ctx)
+}
+
+// ModelFailoverStatuses is the resolver for the modelFailoverStatuses field.
+func (r *queryResolver) ModelFailoverStatuses(ctx context.Context) ([]*ModelFailoverRuntimeStatus, error) {
+	breaker := r.defaultSelector.ModelCircuitBreaker()
+	if breaker == nil {
+		return []*ModelFailoverRuntimeStatus{}, nil
+	}
+
+	channelNames := make(map[int]string)
+	if r.channelService != nil {
+		for _, channel := range r.channelService.GetEnabledChannels() {
+			channelNames[channel.ID] = channel.Name
+		}
+	}
+
+	stats := breaker.GetAllNonClosedModels(ctx)
+	result := make([]*ModelFailoverRuntimeStatus, 0, len(stats))
+	for _, stat := range stats {
+		status := &ModelFailoverRuntimeStatus{
+			ChannelID:           stat.ChannelID,
+			ChannelName:         channelNames[stat.ChannelID],
+			ModelID:             stat.ModelID,
+			State:               string(stat.State),
+			ConsecutiveFailures: stat.ConsecutiveFailures,
+		}
+		if !stat.LastFailureAt.IsZero() {
+			status.LastFailureAt = lo.ToPtr(stat.LastFailureAt)
+		}
+		if !stat.LastSuccessAt.IsZero() {
+			status.LastSuccessAt = lo.ToPtr(stat.LastSuccessAt)
+		}
+		if !stat.NextProbeAt.IsZero() {
+			status.NextProbeAt = lo.ToPtr(stat.NextProbeAt)
+		}
+		result = append(result, status)
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].State != result[j].State {
+			return result[i].State == string(biz.StateOpen)
+		}
+		if result[i].ChannelID != result[j].ChannelID {
+			return result[i].ChannelID < result[j].ChannelID
+		}
+		return result[i].ModelID < result[j].ModelID
+	})
+
+	return result, nil
 }
 
 // WebhookNotifierConfig is the resolver for the webhookNotifierConfig field.

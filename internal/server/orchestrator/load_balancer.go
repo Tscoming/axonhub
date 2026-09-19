@@ -90,6 +90,7 @@ type RetryPolicyProvider interface {
 
 // Save the requested model ID in the context, to let model aware strategy use it, e.g. circuit breaker.
 type modelContextKey struct{}
+type actualModelContextKey struct{}
 type streamContextKey struct{}
 
 // contextWithRequestedModel adds the requested model ID to the context.
@@ -100,6 +101,18 @@ func contextWithRequestedModel(ctx context.Context, modelID string) context.Cont
 // requestedModelFromContext extracts the requested model ID from the context.
 func requestedModelFromContext(ctx context.Context) string {
 	if model, ok := ctx.Value(modelContextKey{}).(string); ok {
+		return model
+	}
+
+	return ""
+}
+
+func contextWithActualModel(ctx context.Context, modelID string) context.Context {
+	return context.WithValue(ctx, actualModelContextKey{}, modelID)
+}
+
+func actualModelFromContext(ctx context.Context) string {
+	if model, ok := ctx.Value(actualModelContextKey{}).(string); ok {
 		return model
 	}
 
@@ -126,6 +139,8 @@ type LoadBalancer struct {
 	strictRoundRobin       bool
 	roundRobinMu           sync.Mutex
 	roundRobinCursors      map[string]uint64
+	modelFailoverHealth    ModelFailoverHealthProvider
+	modelFailoverMetrics   *ModelFailoverMetrics
 	debug                  bool
 }
 
@@ -166,6 +181,19 @@ func (lb *LoadBalancer) WithoutWeightTieBreaker() *LoadBalancer {
 // round-robin candidates after the round-robin order is calculated.
 func (lb *LoadBalancer) WithRoundRobinHealthFilter(filter *RoundRobinHealthStrategy) *LoadBalancer {
 	lb.roundRobinHealthFilter = filter
+
+	return lb
+}
+
+// WithModelFailoverHealth enables actual-model health ordering across providers.
+func (lb *LoadBalancer) WithModelFailoverHealth(provider ModelFailoverHealthProvider) *LoadBalancer {
+	lb.modelFailoverHealth = provider
+
+	return lb
+}
+
+func (lb *LoadBalancer) WithModelFailoverMetrics(metrics *ModelFailoverMetrics) *LoadBalancer {
+	lb.modelFailoverMetrics = metrics
 
 	return lb
 }
@@ -238,9 +266,10 @@ func (lb *LoadBalancer) sortProduction(
 	scored := make([]candidateScore, len(candidates))
 	for i, c := range candidates {
 		totalScore := 0.0
+		candidateCtx := contextWithActualModel(ctx, candidateActualModel(c))
 		// Apply all strategies
 		for _, strategy := range lb.strategies {
-			totalScore += strategy.Score(ctx, c.Channel)
+			totalScore += strategy.Score(candidateCtx, c.Channel)
 		}
 
 		scored[i] = candidateScore{
@@ -413,11 +442,12 @@ func (lb *LoadBalancer) sortWithDebug(
 	for i, c := range candidates {
 		totalScore := 0.0
 		strategyScores := make([]StrategyScore, 0, len(lb.strategies))
+		candidateCtx := contextWithActualModel(ctx, candidateActualModel(c))
 
 		// Apply all strategies and collect detailed scores
 		for _, strategy := range lb.strategies {
 			scoreStart := time.Now()
-			score, strategyScore := strategy.ScoreWithDebug(ctx, c.Channel)
+			score, strategyScore := strategy.ScoreWithDebug(candidateCtx, c.Channel)
 			strategyScore.Duration = time.Since(scoreStart)
 			strategyScores = append(strategyScores, strategyScore)
 			totalScore += score

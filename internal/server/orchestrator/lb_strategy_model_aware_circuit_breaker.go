@@ -40,7 +40,10 @@ func (s *ModelAwareCircuitBreakerStrategy) Name() string {
 // This is the production path with minimal overhead.
 func (s *ModelAwareCircuitBreakerStrategy) Score(ctx context.Context, channel *biz.Channel) float64 {
 	// Get the requested model from context
-	modelID := requestedModelFromContext(ctx)
+	modelID := actualModelFromContext(ctx)
+	if modelID == "" {
+		modelID = requestedModelFromContext(ctx)
+	}
 	if modelID == "" {
 		// If no specific model is requested, return neutral score
 		return s.maxScore * 0.5
@@ -66,7 +69,10 @@ func (s *ModelAwareCircuitBreakerStrategy) ScoreWithDebug(ctx context.Context, c
 	startTime := time.Now()
 
 	// Get the requested model from context
-	modelID := requestedModelFromContext(ctx)
+	modelID := actualModelFromContext(ctx)
+	if modelID == "" {
+		modelID = requestedModelFromContext(ctx)
+	}
 
 	details := map[string]any{
 		"channel_id": channel.ID,

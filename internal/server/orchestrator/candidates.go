@@ -17,6 +17,7 @@ import (
 	"github.com/looplj/axonhub/internal/ent"
 	"github.com/looplj/axonhub/internal/ent/model"
 	"github.com/looplj/axonhub/internal/log"
+	appmetrics "github.com/looplj/axonhub/internal/metrics"
 	"github.com/looplj/axonhub/internal/objects"
 	"github.com/looplj/axonhub/internal/server/biz"
 	"github.com/looplj/axonhub/llm"
@@ -92,15 +93,47 @@ type DefaultSelector struct {
 	// Association resolution cache
 	cacheMu          sync.RWMutex
 	associationCache map[string]*associationCacheEntry
+
+	modelCircuitBreaker  *biz.ModelCircuitBreaker
+	modelFailoverMetrics *ModelFailoverMetrics
 }
 
 func NewDefaultSelector(channelService *biz.ChannelService, modelService *biz.ModelService, systemService *biz.SystemService) *DefaultSelector {
-	return &DefaultSelector{
-		ChannelService:   channelService,
-		ModelService:     modelService,
-		SystemService:    systemService,
-		associationCache: make(map[string]*associationCacheEntry),
+	modelCircuitBreaker := biz.NewModelCircuitBreaker()
+	if systemService != nil {
+		modelCircuitBreaker = biz.NewModelCircuitBreaker(systemService)
 	}
+	modelFailoverMetrics, err := NewModelFailoverMetrics(appmetrics.Meter, modelCircuitBreaker)
+	if err != nil {
+		log.Warn(context.Background(), "failed to register model failover metrics, continuing without them", log.Cause(err))
+		modelFailoverMetrics = nil
+	}
+	modelCircuitBreaker.SetObserver(modelFailoverMetrics)
+
+	return &DefaultSelector{
+		ChannelService:       channelService,
+		ModelService:         modelService,
+		SystemService:        systemService,
+		associationCache:     make(map[string]*associationCacheEntry),
+		modelCircuitBreaker:  modelCircuitBreaker,
+		modelFailoverMetrics: modelFailoverMetrics,
+	}
+}
+
+func (s *DefaultSelector) ModelCircuitBreaker() *biz.ModelCircuitBreaker {
+	if s == nil {
+		return nil
+	}
+
+	return s.modelCircuitBreaker
+}
+
+func (s *DefaultSelector) ModelFailoverMetrics() *ModelFailoverMetrics {
+	if s == nil {
+		return nil
+	}
+
+	return s.modelFailoverMetrics
 }
 
 func (s *DefaultSelector) Select(ctx context.Context, req *llm.Request) ([]*ChannelModelsCandidate, error) {
@@ -904,7 +937,14 @@ func (s *LoadBalancedSelector) sortCandidates(
 		return nil
 	}
 
-	if len(candidates) <= 1 {
+	if len(candidates) == 0 {
+		return candidates
+	}
+	if len(candidates) == 1 {
+		if loadBalancer != nil && loadBalancer.modelFailoverEnabled(ctx) {
+			loadBalancer.prioritizeCandidateModelsByHealth(ctx, candidates[0])
+		}
+
 		return candidates
 	}
 
@@ -919,12 +959,15 @@ func (s *LoadBalancedSelector) sortCandidates(
 
 	// Sort priorities: lower value = higher priority
 	slices.Sort(priorities)
+	if loadBalancer != nil && loadBalancer.modelFailoverEnabled(ctx) {
+		loadBalancer.orderPrioritiesByModelHealth(ctx, priorities, priorityGroups)
+	}
 
 	// For each priority group, apply load balancing to sort candidates within the group
 	// Stop early if we have collected enough candidates
 	var result []*ChannelModelsCandidate
 
-	for _, p := range priorities {
+	for priorityIndex, p := range priorities {
 		group := priorityGroups[p]
 
 		// Apply load balancing to sort candidates within this priority group.
@@ -937,6 +980,9 @@ func (s *LoadBalancedSelector) sortCandidates(
 		} else {
 			sortedCandidates = loadBalancer.SortWithoutTracking(ctx, group, req.Model, useStream)
 		}
+		if loadBalancer != nil && loadBalancer.modelFailoverEnabled(ctx) {
+			sortedCandidates = loadBalancer.prioritizeCandidatesByModelHealth(ctx, sortedCandidates)
+		}
 
 		// Add candidates, but stop if we have enough
 		remaining := requiredCount - len(result)
@@ -944,11 +990,16 @@ func (s *LoadBalancedSelector) sortCandidates(
 			break
 		}
 
-		if len(sortedCandidates) <= remaining {
+		groupLimit := remaining
+		if loadBalancer != nil && loadBalancer.modelFailoverEnabled(ctx) {
+			groupsAfter := len(priorities) - priorityIndex - 1
+			reserveForFallbacks := min(loadBalancer.reserveFallbackPriorities(ctx), groupsAfter, max(remaining-1, 0))
+			groupLimit -= reserveForFallbacks
+		}
+		if len(sortedCandidates) <= groupLimit {
 			result = append(result, sortedCandidates...)
 		} else {
-			result = append(result, sortedCandidates[:remaining]...)
-			break
+			result = append(result, sortedCandidates[:groupLimit]...)
 		}
 	}
 

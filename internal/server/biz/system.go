@@ -329,6 +329,19 @@ type RetryPolicy struct {
 
 	// UpstreamErrorPolicy controls how provider errors are exposed to API users.
 	UpstreamErrorPolicy UpstreamErrorPolicy `json:"upstream_error_policy"`
+
+	// ModelFailover controls actual-model health tracking and priority fallback.
+	ModelFailover *ModelFailoverPolicy `json:"model_failover"`
+}
+
+type ModelFailoverPolicy struct {
+	Enabled                   bool    `json:"enabled"`
+	HalfOpenThreshold         int     `json:"half_open_threshold"`
+	OpenThreshold             int     `json:"open_threshold"`
+	FailureStatsTTLSeconds    int     `json:"failure_stats_ttl_seconds"`
+	ProbeIntervalSeconds      int     `json:"probe_interval_seconds"`
+	HalfOpenWeight            float64 `json:"half_open_weight"`
+	ReserveFallbackPriorities int     `json:"reserve_fallback_priorities"`
 }
 
 type TraceStickyMode string
@@ -1140,6 +1153,38 @@ func normalizeRetryPolicy(policy *RetryPolicy) {
 	if policy.UpstreamErrorPolicy.Mode == UpstreamErrorModeCustom &&
 		strings.TrimSpace(policy.UpstreamErrorPolicy.CustomMessage) == "" {
 		policy.UpstreamErrorPolicy.Mode = UpstreamErrorModeHidden
+	}
+
+	if policy.ModelFailover == nil {
+		modelFailover := *defaultRetryPolicy.ModelFailover
+		policy.ModelFailover = &modelFailover
+	} else {
+		normalizeModelFailoverPolicy(policy.ModelFailover)
+	}
+}
+
+func normalizeModelFailoverPolicy(policy *ModelFailoverPolicy) {
+	defaults := defaultRetryPolicy.ModelFailover
+	if policy.HalfOpenThreshold <= 0 {
+		policy.HalfOpenThreshold = defaults.HalfOpenThreshold
+	}
+	if policy.OpenThreshold <= policy.HalfOpenThreshold {
+		policy.OpenThreshold = max(defaults.OpenThreshold, policy.HalfOpenThreshold+1)
+	}
+	if policy.FailureStatsTTLSeconds <= 0 {
+		policy.FailureStatsTTLSeconds = defaults.FailureStatsTTLSeconds
+	}
+	if policy.ProbeIntervalSeconds <= 0 {
+		policy.ProbeIntervalSeconds = defaults.ProbeIntervalSeconds
+	}
+	if policy.HalfOpenWeight <= 0 || policy.HalfOpenWeight > 1 {
+		policy.HalfOpenWeight = defaults.HalfOpenWeight
+	}
+	if policy.ReserveFallbackPriorities < 0 {
+		policy.ReserveFallbackPriorities = 0
+	}
+	if policy.ReserveFallbackPriorities > 10 {
+		policy.ReserveFallbackPriorities = 10
 	}
 }
 

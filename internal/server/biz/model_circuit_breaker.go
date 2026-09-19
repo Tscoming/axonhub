@@ -101,14 +101,34 @@ type ModelCircuitBreakerStats struct {
 // ModelCircuitBreaker manages the circuit breaker status of models across channels.
 type ModelCircuitBreaker struct {
 	// In-memory model health statistics
-	modelStats *xmap.Map[ChannelModelKey, *ModelCircuitBreakerStats]
+	modelStats     *xmap.Map[ChannelModelKey, *ModelCircuitBreakerStats]
+	policyProvider interface {
+		RetryPolicyOrDefault(ctx context.Context) *RetryPolicy
+	}
+	observer ModelCircuitBreakerObserver
+}
+
+type ModelCircuitBreakerObserver interface {
+	RecordStateTransition(ctx context.Context, channelID int, modelID string, from, to CircuitBreakerState)
+	RecordProbe(ctx context.Context, channelID int, modelID, outcome string)
 }
 
 // NewModelCircuitBreaker creates a new model circuit breaker.
-func NewModelCircuitBreaker() *ModelCircuitBreaker {
-	return &ModelCircuitBreaker{
+func NewModelCircuitBreaker(policyProviders ...interface {
+	RetryPolicyOrDefault(ctx context.Context) *RetryPolicy
+}) *ModelCircuitBreaker {
+	breaker := &ModelCircuitBreaker{
 		modelStats: xmap.New[ChannelModelKey, *ModelCircuitBreakerStats](),
 	}
+	if len(policyProviders) > 0 {
+		breaker.policyProvider = policyProviders[0]
+	}
+
+	return breaker
+}
+
+func (m *ModelCircuitBreaker) SetObserver(observer ModelCircuitBreakerObserver) {
+	m.observer = observer
 }
 
 // ChannelModelKey generates a unique key for channel and model combination.
@@ -133,7 +153,6 @@ func (m *ModelCircuitBreaker) getStats(channelID int, modelID string) *ModelCirc
 		ModelID:             modelID,
 		State:               StateClosed,
 		ConsecutiveFailures: 0,
-		LastSuccessAt:       time.Now(),
 	}
 
 	actual, _ := m.modelStats.LoadOrStore(key, stats)
@@ -143,9 +162,30 @@ func (m *ModelCircuitBreaker) getStats(channelID int, modelID string) *ModelCirc
 
 // GetPolicy retrieves the model circuit breaker policy from system settings.
 func (m *ModelCircuitBreaker) GetPolicy(ctx context.Context) *ModelCircuitBreakerPolicy {
-	// For now, return default policy
-	// TODO: Integrate with system settings when ready
+	if m.policyProvider != nil {
+		retryPolicy := m.policyProvider.RetryPolicyOrDefault(ctx)
+		if retryPolicy != nil && retryPolicy.ModelFailover != nil {
+			policy := retryPolicy.ModelFailover
+			return &ModelCircuitBreakerPolicy{
+				HalfOpenThreshold: policy.HalfOpenThreshold,
+				OpenThreshold:     policy.OpenThreshold,
+				FailureStatsTTL:   time.Duration(policy.FailureStatsTTLSeconds) * time.Second,
+				ProbeInterval:     time.Duration(policy.ProbeIntervalSeconds) * time.Second,
+				HalfOpenWeight:    policy.HalfOpenWeight,
+			}
+		}
+	}
+
 	return DefaultModelCircuitBreakerPolicy()
+}
+
+func (m *ModelCircuitBreaker) Enabled(ctx context.Context) bool {
+	if m.policyProvider == nil {
+		return true
+	}
+
+	policy := m.policyProvider.RetryPolicyOrDefault(ctx)
+	return policy != nil && policy.ModelFailover != nil && policy.ModelFailover.Enabled
 }
 
 // RecordError records an error for the specified channel and model.
@@ -181,6 +221,7 @@ func (m *ModelCircuitBreaker) RecordError(ctx context.Context, channelID int, mo
 	// Prioritize Open state, then Half-Open state
 	if stats.ConsecutiveFailures >= policy.OpenThreshold {
 		if stats.State != StateOpen {
+			previousState := stats.State
 			stats.State = StateOpen
 			stats.NextProbeAt = now.Add(policy.ProbeInterval) // Set next probe time
 			stats.probeAttempts = 0                           // Reset probe count
@@ -190,6 +231,7 @@ func (m *ModelCircuitBreaker) RecordError(ctx context.Context, channelID int, mo
 				log.String("model_id", modelID),
 				log.Int("failures", stats.ConsecutiveFailures),
 			)
+			m.recordStateTransition(ctx, channelID, modelID, previousState, StateOpen)
 		} else if wasProbe {
 			// Only apply exponential backoff when an actual probe failed.
 			// Non-probe errors (e.g. requests rejected by circuit breaker) must not
@@ -210,9 +252,11 @@ func (m *ModelCircuitBreaker) RecordError(ctx context.Context, channelID int, mo
 				log.Time("next_probe_at", stats.NextProbeAt),
 				log.Int("probe_attempts", stats.probeAttempts),
 			)
+			m.recordProbe(ctx, channelID, modelID, "failure")
 		}
 	} else if stats.ConsecutiveFailures >= policy.HalfOpenThreshold {
 		if stats.State != StateHalfOpen {
+			previousState := stats.State
 			stats.State = StateHalfOpen
 
 			log.Warn(ctx, "model turn to half-open due to consecutive failures",
@@ -220,12 +264,13 @@ func (m *ModelCircuitBreaker) RecordError(ctx context.Context, channelID int, mo
 				log.String("model_id", modelID),
 				log.Int("failures", stats.ConsecutiveFailures),
 			)
+			m.recordStateTransition(ctx, channelID, modelID, previousState, StateHalfOpen)
 		}
 	}
 }
 
 // RecordSuccess records a successful request for the specified channel and model.
-func (m *ModelCircuitBreaker) RecordSuccess(ctx context.Context, channelID int, modelID string) {
+func (m *ModelCircuitBreaker) RecordSuccess(ctx context.Context, channelID int, modelID string, wasProbe ...bool) {
 	stats := m.getStats(channelID, modelID)
 
 	stats.Lock()
@@ -234,7 +279,8 @@ func (m *ModelCircuitBreaker) RecordSuccess(ctx context.Context, channelID int, 
 	stats.LastSuccessAt = time.Now()
 
 	// Reset all negative status immediately upon a single success
-	if stats.State != StateClosed {
+	previousState := stats.State
+	if previousState != StateClosed {
 		log.Info(ctx, "model recovered to closed state",
 			log.Int("channel_id", channelID),
 			log.String("model_id", modelID),
@@ -248,6 +294,12 @@ func (m *ModelCircuitBreaker) RecordSuccess(ctx context.Context, channelID int, 
 	stats.NextProbeAt = time.Time{} // Clear probe time
 	stats.probingInProgress = 0     // Reset probing flag
 	stats.probeAttempts = 0         // Reset probe count
+	if previousState != StateClosed {
+		m.recordStateTransition(ctx, channelID, modelID, previousState, StateClosed)
+	}
+	if len(wasProbe) > 0 && wasProbe[0] {
+		m.recordProbe(ctx, channelID, modelID, "success")
+	}
 }
 
 // GetModelCircuitBreakerStats returns the current state and statistics of a model.
@@ -297,11 +349,13 @@ func (m *ModelCircuitBreaker) GetEffectiveWeight(ctx context.Context, channelID 
 				log.Int("previous_failures", stats.ConsecutiveFailures),
 				log.Duration("time_since_last_failure", time.Since(stats.LastFailureAt)),
 			)
+			previousState := stats.State
 			stats.State = StateClosed
 			stats.ConsecutiveFailures = 0
 			stats.NextProbeAt = time.Time{}
 			stats.probeAttempts = 0
 			atomic.StoreInt32(&stats.probingInProgress, 0)
+			m.recordStateTransition(ctx, channelID, modelID, previousState, StateClosed)
 		}
 		stats.Unlock()
 		stats.RLock()
@@ -341,14 +395,34 @@ func (m *ModelCircuitBreaker) TryBeginProbe(ctx context.Context, channelID int, 
 	defer stats.Unlock()
 
 	if stats.State != StateOpen {
+		m.recordProbe(ctx, channelID, modelID, "rejected")
 		return false
 	}
 
 	if stats.NextProbeAt.IsZero() || time.Now().Before(stats.NextProbeAt) {
+		m.recordProbe(ctx, channelID, modelID, "rejected")
 		return false
 	}
 
-	return atomic.CompareAndSwapInt32(&stats.probingInProgress, 0, 1)
+	if !atomic.CompareAndSwapInt32(&stats.probingInProgress, 0, 1) {
+		m.recordProbe(ctx, channelID, modelID, "rejected")
+		return false
+	}
+
+	m.recordProbe(ctx, channelID, modelID, "started")
+	return true
+}
+
+func (m *ModelCircuitBreaker) recordStateTransition(ctx context.Context, channelID int, modelID string, from, to CircuitBreakerState) {
+	if m.observer != nil {
+		m.observer.RecordStateTransition(ctx, channelID, modelID, from, to)
+	}
+}
+
+func (m *ModelCircuitBreaker) recordProbe(ctx context.Context, channelID int, modelID, outcome string) {
+	if m.observer != nil {
+		m.observer.RecordProbe(ctx, channelID, modelID, outcome)
+	}
 }
 
 func (m *ModelCircuitBreaker) EndProbe(channelID int, modelID string) {

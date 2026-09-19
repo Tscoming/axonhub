@@ -1398,3 +1398,35 @@ func TestNormalizeRetryPolicy_LoadBalancerStrategy(t *testing.T) {
 		}
 	})
 }
+
+func TestNormalizeRetryPolicy_ModelFailover(t *testing.T) {
+	t.Run("missing policy uses defaults", func(t *testing.T) {
+		policy := &RetryPolicy{}
+		normalizeRetryPolicy(policy)
+
+		require.NotNil(t, policy.ModelFailover)
+		require.Equal(t, defaultRetryPolicy.ModelFailover, policy.ModelFailover)
+		require.NotSame(t, defaultRetryPolicy.ModelFailover, policy.ModelFailover)
+	})
+
+	t.Run("invalid values are normalized and disabled is preserved", func(t *testing.T) {
+		policy := &RetryPolicy{ModelFailover: &ModelFailoverPolicy{
+			Enabled:                   false,
+			HalfOpenThreshold:         7,
+			OpenThreshold:             4,
+			FailureStatsTTLSeconds:    -1,
+			ProbeIntervalSeconds:      0,
+			HalfOpenWeight:            2,
+			ReserveFallbackPriorities: 99,
+		}}
+		normalizeRetryPolicy(policy)
+
+		require.False(t, policy.ModelFailover.Enabled)
+		require.Equal(t, 7, policy.ModelFailover.HalfOpenThreshold)
+		require.Equal(t, 8, policy.ModelFailover.OpenThreshold)
+		require.Equal(t, defaultRetryPolicy.ModelFailover.FailureStatsTTLSeconds, policy.ModelFailover.FailureStatsTTLSeconds)
+		require.Equal(t, defaultRetryPolicy.ModelFailover.ProbeIntervalSeconds, policy.ModelFailover.ProbeIntervalSeconds)
+		require.Equal(t, defaultRetryPolicy.ModelFailover.HalfOpenWeight, policy.ModelFailover.HalfOpenWeight)
+		require.Equal(t, 10, policy.ModelFailover.ReserveFallbackPriorities)
+	})
+}

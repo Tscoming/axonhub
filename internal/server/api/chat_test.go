@@ -852,6 +852,29 @@ func TestPlaygroundHandleError_QuotaExhausted_Returns503(t *testing.T) {
 	assert.Equal(t, "all channels quota exhausted for model gpt-4", errResp.Error.Message)
 }
 
+func TestNoAvailableChannelError_Returns503(t *testing.T) {
+	err := orchestrator.NewNoAvailableChannelError("gpt-4")
+
+	assert.Equal(t, http.StatusServiceUnavailable, streamErrorStatus(err))
+
+	formatted := FormatStreamError(context.Background(), err)
+	data, marshalErr := json.Marshal(formatted)
+	require.NoError(t, marshalErr)
+	assert.JSONEq(t, `{"error":{"message":"no available channels for model gpt-4: all candidates skipped by circuit breaker","type":"no_available_channel","code":"no_available_channel"}}`, string(data))
+
+	wrapped := wrapQuotaExhaustedAsResponseError(err)
+	var responseErr *llm.ResponseError
+	require.ErrorAs(t, wrapped, &responseErr)
+	assert.Equal(t, http.StatusServiceUnavailable, responseErr.StatusCode)
+	assert.Equal(t, errCodeNoAvailableChannel, responseErr.Detail.Code)
+
+	handlers := &PlaygroundHandlers{}
+	playgroundErr := handlers.HandleError(err)
+	assert.Equal(t, http.StatusServiceUnavailable, playgroundErr.Status)
+	assert.Equal(t, http.StatusServiceUnavailable, playgroundErr.Error.Code)
+	assert.Equal(t, err.Error(), playgroundErr.Error.Message)
+}
+
 func TestPlaygroundHandleError_OtherError_Returns500(t *testing.T) {
 	handlers := &PlaygroundHandlers{}
 

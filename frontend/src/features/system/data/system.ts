@@ -107,6 +107,15 @@ const RETRY_POLICY_QUERY = `
         mode
         customMessage
       }
+      modelFailover {
+        enabled
+        halfOpenThreshold
+        openThreshold
+        failureStatsTTLSeconds
+        probeIntervalSeconds
+        halfOpenWeight
+        reserveFallbackPriorities
+      }
       autoDisableChannel {
         enabled
         statuses {
@@ -121,6 +130,21 @@ const RETRY_POLICY_QUERY = `
 const UPDATE_RETRY_POLICY_MUTATION = `
   mutation UpdateRetryPolicy($input: UpdateRetryPolicyInput!) {
     updateRetryPolicy(input: $input)
+  }
+`;
+
+const MODEL_FAILOVER_STATUSES_QUERY = `
+  query ModelFailoverStatuses {
+    modelFailoverStatuses {
+      channelID
+      channelName
+      modelID
+      state
+      consecutiveFailures
+      lastFailureAt
+      lastSuccessAt
+      nextProbeAt
+    }
   }
 `;
 
@@ -359,6 +383,28 @@ export interface RetryPolicy {
   autoDisableChannel: AutoDisableChannel;
   emptyResponseDetection: boolean;
   upstreamErrorPolicy: UpstreamErrorPolicy;
+  modelFailover: ModelFailoverPolicy;
+}
+
+export interface ModelFailoverPolicy {
+  enabled: boolean;
+  halfOpenThreshold: number;
+  openThreshold: number;
+  failureStatsTTLSeconds: number;
+  probeIntervalSeconds: number;
+  halfOpenWeight: number;
+  reserveFallbackPriorities: number;
+}
+
+export interface ModelFailoverRuntimeStatus {
+  channelID: number;
+  channelName: string;
+  modelID: string;
+  state: 'half_open' | 'open';
+  consecutiveFailures: number;
+  lastFailureAt?: string;
+  lastSuccessAt?: string;
+  nextProbeAt?: string;
 }
 
 export interface UpstreamErrorPolicy {
@@ -388,6 +434,7 @@ export interface RetryPolicyInput {
   autoDisableChannel?: AutoDisableChannelInput;
   emptyResponseDetection?: boolean;
   upstreamErrorPolicy?: Partial<UpstreamErrorPolicy>;
+  modelFailover?: Partial<ModelFailoverPolicy>;
 }
 
 export type TraceStickyMode = 'DISABLED' | 'PREFER_PREVIOUS_CHANNEL';
@@ -554,16 +601,10 @@ export function usePreviewGcCleanup() {
   });
 }
 
-export async function previewGcCleanup(
-  input: TriggerGcCleanupInput,
-  signal?: AbortSignal
-): Promise<GcCleanupPreviewItem[]> {
-  const data = await graphqlRequest<{ previewGcCleanup: GcCleanupPreviewItem[] }>(
-    PREVIEW_GC_CLEANUP_QUERY,
-    { input },
-    undefined,
-    { signal }
-  );
+export async function previewGcCleanup(input: TriggerGcCleanupInput, signal?: AbortSignal): Promise<GcCleanupPreviewItem[]> {
+  const data = await graphqlRequest<{ previewGcCleanup: GcCleanupPreviewItem[] }>(PREVIEW_GC_CLEANUP_QUERY, { input }, undefined, {
+    signal,
+  });
   return data.previewGcCleanup;
 }
 
@@ -581,6 +622,18 @@ export function useRetryPolicy() {
         throw error;
       }
     },
+  });
+}
+
+export function useModelFailoverStatuses(enabled = true) {
+  return useQuery({
+    queryKey: ['modelFailoverStatuses'],
+    queryFn: async () => {
+      const data = await graphqlRequest<{ modelFailoverStatuses: ModelFailoverRuntimeStatus[] }>(MODEL_FAILOVER_STATUSES_QUERY);
+      return data.modelFailoverStatuses;
+    },
+    enabled,
+    refetchInterval: 10_000,
   });
 }
 
@@ -775,10 +828,9 @@ export function useExportCacheDiagnostics() {
 
   return useMutation({
     mutationFn: async () => {
-      const data = await graphqlRequest<{ getCacheDiagnostics: GetCacheDiagnosticsPayload }>(
-        GET_CACHE_DIAGNOSTICS_QUERY,
-        { input: { targets: ['CHANNEL_CACHE'] } }
-      );
+      const data = await graphqlRequest<{ getCacheDiagnostics: GetCacheDiagnosticsPayload }>(GET_CACHE_DIAGNOSTICS_QUERY, {
+        input: { targets: ['CHANNEL_CACHE'] },
+      });
       return data.getCacheDiagnostics;
     },
     onSuccess: (data) => {
@@ -1573,7 +1625,6 @@ export function useDeleteProxyPreset() {
   });
 }
 
-
 // User-Agent Pass-Through Settings
 const USER_AGENT_PASS_THROUGH_SETTINGS_QUERY = `
   query UserAgentPassThroughSettings {
@@ -1612,7 +1663,9 @@ export function useUserAgentPassThroughSettings(options?: { enabled?: boolean })
     enabled: (options?.enabled ?? true) && canReadSystemSettings,
     queryFn: async () => {
       try {
-        const data = await graphqlRequest<{ userAgentPassThroughSettings: UserAgentPassThroughSettings }>(USER_AGENT_PASS_THROUGH_SETTINGS_QUERY);
+        const data = await graphqlRequest<{ userAgentPassThroughSettings: UserAgentPassThroughSettings }>(
+          USER_AGENT_PASS_THROUGH_SETTINGS_QUERY
+        );
         return data.userAgentPassThroughSettings;
       } catch (error) {
         handleError(error, i18n.t('common.errors.internalServerError'));
@@ -1627,7 +1680,9 @@ export function useUpdateUserAgentPassThroughSettings() {
 
   return useMutation({
     mutationFn: async (input: UpdateUserAgentPassThroughSettingsInput) => {
-      const data = await graphqlRequest<{ updateUserAgentPassThroughSettings: boolean }>(UPDATE_USER_AGENT_PASS_THROUGH_SETTINGS_MUTATION, { input });
+      const data = await graphqlRequest<{ updateUserAgentPassThroughSettings: boolean }>(UPDATE_USER_AGENT_PASS_THROUGH_SETTINGS_MUTATION, {
+        input,
+      });
       return data.updateUserAgentPassThroughSettings;
     },
     onSuccess: () => {
@@ -1744,7 +1799,9 @@ export function useUpdateUsageCostInjectionSettings() {
 
   return useMutation({
     mutationFn: async (input: UpdateUsageCostInjectionSettingsInput) => {
-      const data = await graphqlRequest<{ updateUsageCostInjectionSettings: boolean }>(UPDATE_USAGE_COST_INJECTION_SETTINGS_MUTATION, { input });
+      const data = await graphqlRequest<{ updateUsageCostInjectionSettings: boolean }>(UPDATE_USAGE_COST_INJECTION_SETTINGS_MUTATION, {
+        input,
+      });
       return data.updateUsageCostInjectionSettings;
     },
     onSuccess: () => {

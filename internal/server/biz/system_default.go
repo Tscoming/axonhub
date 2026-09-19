@@ -86,6 +86,15 @@ var defaultRetryPolicy = RetryPolicy{
 	UpstreamErrorPolicy: UpstreamErrorPolicy{
 		Mode: UpstreamErrorModePassthrough,
 	},
+	ModelFailover: &ModelFailoverPolicy{
+		Enabled:                   true,
+		HalfOpenThreshold:         3,
+		OpenThreshold:             5,
+		FailureStatsTTLSeconds:    1800,
+		ProbeIntervalSeconds:      300,
+		HalfOpenWeight:            0.3,
+		ReserveFallbackPriorities: 1,
+	},
 }
 
 var defaultModelSettings = SystemModelSettings{

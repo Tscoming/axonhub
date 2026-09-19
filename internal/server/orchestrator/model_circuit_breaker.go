@@ -28,6 +28,7 @@ type modelCircuitBreakerTracker struct {
 	probeActive    bool
 	probeChannelID int
 	probeModelID   string
+	skippedCount   int
 }
 
 func (m *modelCircuitBreakerTracker) Name() string {
@@ -35,14 +36,12 @@ func (m *modelCircuitBreakerTracker) Name() string {
 }
 
 func (m *modelCircuitBreakerTracker) OnOutboundRawRequest(ctx context.Context, request *httpclient.Request) (*httpclient.Request, error) {
-	if m.outbound == nil || m.outbound.state == nil ||
-		m.outbound.state.RoutingPolicy.LoadBalancerStrategy != biz.LoadBalancerStrategyCircuitBreaker ||
-		m.modelCircuitBreaker == nil {
+	if !m.shouldEnforce(ctx) {
 		return request, nil
 	}
 
 	channel := m.outbound.GetCurrentChannel()
-	modelID := m.outbound.GetRequestedModel()
+	modelID := m.outbound.GetCurrentModelID()
 	if channel == nil || modelID == "" {
 		return request, nil
 	}
@@ -53,10 +52,15 @@ func (m *modelCircuitBreakerTracker) OnOutboundRawRequest(ctx context.Context, r
 	}
 
 	if !m.modelCircuitBreaker.TryBeginProbe(ctx, channel.ID, modelID) {
+		m.skippedCount++
 		log.Debug(ctx, "skipping candidate by circuit breaker: probe conditions not met or another probe in progress",
 			log.Int("channel_id", channel.ID),
 			log.String("model_id", modelID),
 		)
+
+		if m.skippedCount == len(m.outbound.state.ChannelModelsCandidates) {
+			return nil, NewNoAvailableChannelError(m.outbound.state.OriginalModel)
+		}
 
 		return nil, errSkipCandidateByCircuitBreaker
 	}
@@ -69,24 +73,25 @@ func (m *modelCircuitBreakerTracker) OnOutboundRawRequest(ctx context.Context, r
 }
 
 func (m *modelCircuitBreakerTracker) OnOutboundLlmResponse(ctx context.Context, response *llm.Response) (*llm.Response, error) {
-	if !m.shouldTrack() {
+	if !m.shouldTrack(ctx) {
 		return response, nil
 	}
 
+	wasProbe := m.probeActive
 	m.releaseProbeLease()
 
 	channel := m.outbound.GetCurrentChannel()
-	modelID := m.outbound.GetRequestedModel()
+	modelID := m.outbound.GetCurrentModelID()
 	if channel == nil || modelID == "" {
 		return response, nil
 	}
-	m.modelCircuitBreaker.RecordSuccess(ctx, channel.ID, modelID)
+	m.modelCircuitBreaker.RecordSuccess(ctx, channel.ID, modelID, wasProbe)
 
 	return response, nil
 }
 
 func (m *modelCircuitBreakerTracker) OnOutboundRawError(ctx context.Context, err error) {
-	if !m.shouldTrack() {
+	if !m.shouldTrack(ctx) {
 		return
 	}
 
@@ -103,9 +108,12 @@ func (m *modelCircuitBreakerTracker) OnOutboundRawError(ctx context.Context, err
 	if errors.Is(err, errSkipCandidateByCircuitBreaker) || isChannelQueueError(err) {
 		return
 	}
+	if !isRetryableError(err) {
+		return
+	}
 
 	channel := m.outbound.GetCurrentChannel()
-	modelID := m.outbound.GetRequestedModel()
+	modelID := m.outbound.GetCurrentModelID()
 	if channel == nil || modelID == "" {
 		return
 	}
@@ -113,12 +121,12 @@ func (m *modelCircuitBreakerTracker) OnOutboundRawError(ctx context.Context, err
 }
 
 func (m *modelCircuitBreakerTracker) OnOutboundLlmStream(ctx context.Context, stream streams.Stream[*llm.Response]) (streams.Stream[*llm.Response], error) {
-	if !m.shouldTrack() {
+	if !m.shouldTrack(ctx) {
 		return stream, nil
 	}
 
 	channelID := 0
-	modelID := m.outbound.GetRequestedModel()
+	modelID := m.outbound.GetCurrentModelID()
 	if channel := m.outbound.GetCurrentChannel(); channel != nil {
 		channelID = channel.ID
 	}
@@ -129,6 +137,7 @@ func (m *modelCircuitBreakerTracker) OnOutboundLlmStream(ctx context.Context, st
 		state:     m.outbound.state,
 		channelID: channelID,
 		modelID:   modelID,
+		wasProbe:  m.probeActive,
 		release: func() {
 			if m.outbound != nil {
 				m.releaseProbeLease()
@@ -140,11 +149,27 @@ func (m *modelCircuitBreakerTracker) OnOutboundLlmStream(ctx context.Context, st
 	}, nil
 }
 
-func (m *modelCircuitBreakerTracker) shouldTrack() bool {
-	return m.outbound != nil &&
-		m.outbound.state != nil &&
-		m.outbound.state.RoutingPolicy.LoadBalancerStrategy == biz.LoadBalancerStrategyCircuitBreaker &&
-		m.modelCircuitBreaker != nil
+func (m *modelCircuitBreakerTracker) shouldTrack(ctx context.Context) bool {
+	if m.outbound == nil || m.outbound.state == nil || m.modelCircuitBreaker == nil {
+		return false
+	}
+
+	strategy := m.outbound.state.RoutingPolicy.LoadBalancerStrategy
+	if strategy == biz.LoadBalancerStrategyCircuitBreaker {
+		return true
+	}
+
+	return strategy == biz.LoadBalancerStrategyRoundRobin && m.modelCircuitBreaker.Enabled(ctx)
+}
+
+func (m *modelCircuitBreakerTracker) shouldEnforce(ctx context.Context) bool {
+	if !m.shouldTrack(ctx) {
+		return false
+	}
+
+	strategy := m.outbound.state.RoutingPolicy.LoadBalancerStrategy
+	return strategy == biz.LoadBalancerStrategyCircuitBreaker ||
+		strategy == biz.LoadBalancerStrategyRoundRobin
 }
 
 func (m *modelCircuitBreakerTracker) releaseProbeLease() {
@@ -172,6 +197,7 @@ type probeReleasingStream struct {
 	modelCircuitBreaker *biz.ModelCircuitBreaker
 	channelID           int
 	modelID             string
+	wasProbe            bool
 }
 
 func (s *probeReleasingStream) Next() bool {
@@ -191,7 +217,7 @@ func (s *probeReleasingStream) Current() *llm.Response {
 	if !s.recorded {
 		if tokenCount := event.Usage.GetCompletionTokens(); tokenCount != nil && *tokenCount > 0 {
 			if s.channelID != 0 && s.modelID != "" {
-				s.modelCircuitBreaker.RecordSuccess(s.ctx, s.channelID, s.modelID)
+				s.modelCircuitBreaker.RecordSuccess(s.ctx, s.channelID, s.modelID, s.wasProbe)
 			}
 			s.recorded = true
 		}

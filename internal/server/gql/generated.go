@@ -898,6 +898,27 @@ type ComplexityRoot struct {
 		Node   func(childComplexity int) int
 	}
 
+	ModelFailoverPolicy struct {
+		Enabled                   func(childComplexity int) int
+		FailureStatsTTLSeconds    func(childComplexity int) int
+		HalfOpenThreshold         func(childComplexity int) int
+		HalfOpenWeight            func(childComplexity int) int
+		OpenThreshold             func(childComplexity int) int
+		ProbeIntervalSeconds      func(childComplexity int) int
+		ReserveFallbackPriorities func(childComplexity int) int
+	}
+
+	ModelFailoverRuntimeStatus struct {
+		ChannelID           func(childComplexity int) int
+		ChannelName         func(childComplexity int) int
+		ConsecutiveFailures func(childComplexity int) int
+		LastFailureAt       func(childComplexity int) int
+		LastSuccessAt       func(childComplexity int) int
+		ModelID             func(childComplexity int) int
+		NextProbeAt         func(childComplexity int) int
+		State               func(childComplexity int) int
+	}
+
 	ModelIDAssociation struct {
 		Exclude func(childComplexity int) int
 		ModelID func(childComplexity int) int
@@ -1405,6 +1426,7 @@ type ComplexityRoot struct {
 		FetchModels                     func(childComplexity int, input biz.FetchModelsInput) int
 		GetCacheDiagnostics             func(childComplexity int, input *GetCacheDiagnosticsInput) int
 		Me                              func(childComplexity int) int
+		ModelFailoverStatuses           func(childComplexity int) int
 		ModelPerformanceStats           func(childComplexity int) int
 		Models                          func(childComplexity int, after *entgql.Cursor[int], first *int, before *entgql.Cursor[int], last *int, orderBy *ent.ModelOrder, where *ent.ModelWhereInput) int
 		MyProjects                      func(childComplexity int) int
@@ -1602,6 +1624,7 @@ type ComplexityRoot struct {
 		LoadBalancerStrategy            func(childComplexity int) int
 		MaxChannelRetries               func(childComplexity int) int
 		MaxSingleChannelRetries         func(childComplexity int) int
+		ModelFailover                   func(childComplexity int) int
 		NonStreamResponseTimeoutSeconds func(childComplexity int) int
 		RetryDelayMs                    func(childComplexity int) int
 		StreamFirstEventTimeoutSeconds  func(childComplexity int) int
@@ -2433,6 +2456,7 @@ type QueryResolver interface {
 	BrandSettings(ctx context.Context) (*BrandSettings, error)
 	StoragePolicy(ctx context.Context) (*biz.StoragePolicy, error)
 	RetryPolicy(ctx context.Context) (*biz.RetryPolicy, error)
+	ModelFailoverStatuses(ctx context.Context) ([]*ModelFailoverRuntimeStatus, error)
 	WebhookNotifierConfig(ctx context.Context) (*biz.WebhookNotifierConfig, error)
 	SystemModelSettings(ctx context.Context) (*biz.SystemModelSettings, error)
 	DefaultDataStorageID(ctx context.Context) (*objects.GUID, error)
@@ -5556,6 +5580,98 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.ModelEdge.Node(childComplexity), true
 
+	case "ModelFailoverPolicy.enabled":
+		if e.complexity.ModelFailoverPolicy.Enabled == nil {
+			break
+		}
+
+		return e.complexity.ModelFailoverPolicy.Enabled(childComplexity), true
+	case "ModelFailoverPolicy.failureStatsTTLSeconds":
+		if e.complexity.ModelFailoverPolicy.FailureStatsTTLSeconds == nil {
+			break
+		}
+
+		return e.complexity.ModelFailoverPolicy.FailureStatsTTLSeconds(childComplexity), true
+	case "ModelFailoverPolicy.halfOpenThreshold":
+		if e.complexity.ModelFailoverPolicy.HalfOpenThreshold == nil {
+			break
+		}
+
+		return e.complexity.ModelFailoverPolicy.HalfOpenThreshold(childComplexity), true
+	case "ModelFailoverPolicy.halfOpenWeight":
+		if e.complexity.ModelFailoverPolicy.HalfOpenWeight == nil {
+			break
+		}
+
+		return e.complexity.ModelFailoverPolicy.HalfOpenWeight(childComplexity), true
+	case "ModelFailoverPolicy.openThreshold":
+		if e.complexity.ModelFailoverPolicy.OpenThreshold == nil {
+			break
+		}
+
+		return e.complexity.ModelFailoverPolicy.OpenThreshold(childComplexity), true
+	case "ModelFailoverPolicy.probeIntervalSeconds":
+		if e.complexity.ModelFailoverPolicy.ProbeIntervalSeconds == nil {
+			break
+		}
+
+		return e.complexity.ModelFailoverPolicy.ProbeIntervalSeconds(childComplexity), true
+	case "ModelFailoverPolicy.reserveFallbackPriorities":
+		if e.complexity.ModelFailoverPolicy.ReserveFallbackPriorities == nil {
+			break
+		}
+
+		return e.complexity.ModelFailoverPolicy.ReserveFallbackPriorities(childComplexity), true
+
+	case "ModelFailoverRuntimeStatus.channelID":
+		if e.complexity.ModelFailoverRuntimeStatus.ChannelID == nil {
+			break
+		}
+
+		return e.complexity.ModelFailoverRuntimeStatus.ChannelID(childComplexity), true
+	case "ModelFailoverRuntimeStatus.channelName":
+		if e.complexity.ModelFailoverRuntimeStatus.ChannelName == nil {
+			break
+		}
+
+		return e.complexity.ModelFailoverRuntimeStatus.ChannelName(childComplexity), true
+	case "ModelFailoverRuntimeStatus.consecutiveFailures":
+		if e.complexity.ModelFailoverRuntimeStatus.ConsecutiveFailures == nil {
+			break
+		}
+
+		return e.complexity.ModelFailoverRuntimeStatus.ConsecutiveFailures(childComplexity), true
+	case "ModelFailoverRuntimeStatus.lastFailureAt":
+		if e.complexity.ModelFailoverRuntimeStatus.LastFailureAt == nil {
+			break
+		}
+
+		return e.complexity.ModelFailoverRuntimeStatus.LastFailureAt(childComplexity), true
+	case "ModelFailoverRuntimeStatus.lastSuccessAt":
+		if e.complexity.ModelFailoverRuntimeStatus.LastSuccessAt == nil {
+			break
+		}
+
+		return e.complexity.ModelFailoverRuntimeStatus.LastSuccessAt(childComplexity), true
+	case "ModelFailoverRuntimeStatus.modelID":
+		if e.complexity.ModelFailoverRuntimeStatus.ModelID == nil {
+			break
+		}
+
+		return e.complexity.ModelFailoverRuntimeStatus.ModelID(childComplexity), true
+	case "ModelFailoverRuntimeStatus.nextProbeAt":
+		if e.complexity.ModelFailoverRuntimeStatus.NextProbeAt == nil {
+			break
+		}
+
+		return e.complexity.ModelFailoverRuntimeStatus.NextProbeAt(childComplexity), true
+	case "ModelFailoverRuntimeStatus.state":
+		if e.complexity.ModelFailoverRuntimeStatus.State == nil {
+			break
+		}
+
+		return e.complexity.ModelFailoverRuntimeStatus.State(childComplexity), true
+
 	case "ModelIDAssociation.exclude":
 		if e.complexity.ModelIDAssociation.Exclude == nil {
 			break
@@ -8505,6 +8621,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Me(childComplexity), true
+	case "Query.modelFailoverStatuses":
+		if e.complexity.Query.ModelFailoverStatuses == nil {
+			break
+		}
+
+		return e.complexity.Query.ModelFailoverStatuses(childComplexity), true
 	case "Query.modelPerformanceStats":
 		if e.complexity.Query.ModelPerformanceStats == nil {
 			break
@@ -9555,6 +9677,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.RetryPolicy.MaxSingleChannelRetries(childComplexity), true
+	case "RetryPolicy.modelFailover":
+		if e.complexity.RetryPolicy.ModelFailover == nil {
+			break
+		}
+
+		return e.complexity.RetryPolicy.ModelFailover(childComplexity), true
 	case "RetryPolicy.nonStreamResponseTimeoutSeconds":
 		if e.complexity.RetryPolicy.NonStreamResponseTimeoutSeconds == nil {
 			break
@@ -11782,6 +11910,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputModelCardLimitInput,
 		ec.unmarshalInputModelCardModalitiesInput,
 		ec.unmarshalInputModelCardReasoningInput,
+		ec.unmarshalInputModelFailoverPolicyInput,
 		ec.unmarshalInputModelIDAssociationInput,
 		ec.unmarshalInputModelMappingInput,
 		ec.unmarshalInputModelOrder,
@@ -31172,6 +31301,441 @@ func (ec *executionContext) fieldContext_ModelEdge_cursor(_ context.Context, fie
 	return fc, nil
 }
 
+func (ec *executionContext) _ModelFailoverPolicy_enabled(ctx context.Context, field graphql.CollectedField, obj *biz.ModelFailoverPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ModelFailoverPolicy_enabled,
+		func(ctx context.Context) (any, error) {
+			return obj.Enabled, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ModelFailoverPolicy_enabled(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelFailoverPolicy",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelFailoverPolicy_halfOpenThreshold(ctx context.Context, field graphql.CollectedField, obj *biz.ModelFailoverPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ModelFailoverPolicy_halfOpenThreshold,
+		func(ctx context.Context) (any, error) {
+			return obj.HalfOpenThreshold, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ModelFailoverPolicy_halfOpenThreshold(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelFailoverPolicy",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelFailoverPolicy_openThreshold(ctx context.Context, field graphql.CollectedField, obj *biz.ModelFailoverPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ModelFailoverPolicy_openThreshold,
+		func(ctx context.Context) (any, error) {
+			return obj.OpenThreshold, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ModelFailoverPolicy_openThreshold(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelFailoverPolicy",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelFailoverPolicy_failureStatsTTLSeconds(ctx context.Context, field graphql.CollectedField, obj *biz.ModelFailoverPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ModelFailoverPolicy_failureStatsTTLSeconds,
+		func(ctx context.Context) (any, error) {
+			return obj.FailureStatsTTLSeconds, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ModelFailoverPolicy_failureStatsTTLSeconds(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelFailoverPolicy",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelFailoverPolicy_probeIntervalSeconds(ctx context.Context, field graphql.CollectedField, obj *biz.ModelFailoverPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ModelFailoverPolicy_probeIntervalSeconds,
+		func(ctx context.Context) (any, error) {
+			return obj.ProbeIntervalSeconds, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ModelFailoverPolicy_probeIntervalSeconds(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelFailoverPolicy",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelFailoverPolicy_halfOpenWeight(ctx context.Context, field graphql.CollectedField, obj *biz.ModelFailoverPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ModelFailoverPolicy_halfOpenWeight,
+		func(ctx context.Context) (any, error) {
+			return obj.HalfOpenWeight, nil
+		},
+		nil,
+		ec.marshalNFloat2float64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ModelFailoverPolicy_halfOpenWeight(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelFailoverPolicy",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelFailoverPolicy_reserveFallbackPriorities(ctx context.Context, field graphql.CollectedField, obj *biz.ModelFailoverPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ModelFailoverPolicy_reserveFallbackPriorities,
+		func(ctx context.Context) (any, error) {
+			return obj.ReserveFallbackPriorities, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ModelFailoverPolicy_reserveFallbackPriorities(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelFailoverPolicy",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelFailoverRuntimeStatus_channelID(ctx context.Context, field graphql.CollectedField, obj *ModelFailoverRuntimeStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ModelFailoverRuntimeStatus_channelID,
+		func(ctx context.Context) (any, error) {
+			return obj.ChannelID, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ModelFailoverRuntimeStatus_channelID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelFailoverRuntimeStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelFailoverRuntimeStatus_channelName(ctx context.Context, field graphql.CollectedField, obj *ModelFailoverRuntimeStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ModelFailoverRuntimeStatus_channelName,
+		func(ctx context.Context) (any, error) {
+			return obj.ChannelName, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ModelFailoverRuntimeStatus_channelName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelFailoverRuntimeStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelFailoverRuntimeStatus_modelID(ctx context.Context, field graphql.CollectedField, obj *ModelFailoverRuntimeStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ModelFailoverRuntimeStatus_modelID,
+		func(ctx context.Context) (any, error) {
+			return obj.ModelID, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ModelFailoverRuntimeStatus_modelID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelFailoverRuntimeStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelFailoverRuntimeStatus_state(ctx context.Context, field graphql.CollectedField, obj *ModelFailoverRuntimeStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ModelFailoverRuntimeStatus_state,
+		func(ctx context.Context) (any, error) {
+			return obj.State, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ModelFailoverRuntimeStatus_state(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelFailoverRuntimeStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelFailoverRuntimeStatus_consecutiveFailures(ctx context.Context, field graphql.CollectedField, obj *ModelFailoverRuntimeStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ModelFailoverRuntimeStatus_consecutiveFailures,
+		func(ctx context.Context) (any, error) {
+			return obj.ConsecutiveFailures, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ModelFailoverRuntimeStatus_consecutiveFailures(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelFailoverRuntimeStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelFailoverRuntimeStatus_lastFailureAt(ctx context.Context, field graphql.CollectedField, obj *ModelFailoverRuntimeStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ModelFailoverRuntimeStatus_lastFailureAt,
+		func(ctx context.Context) (any, error) {
+			return obj.LastFailureAt, nil
+		},
+		nil,
+		ec.marshalOTime2ᚖtimeᚐTime,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ModelFailoverRuntimeStatus_lastFailureAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelFailoverRuntimeStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelFailoverRuntimeStatus_lastSuccessAt(ctx context.Context, field graphql.CollectedField, obj *ModelFailoverRuntimeStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ModelFailoverRuntimeStatus_lastSuccessAt,
+		func(ctx context.Context) (any, error) {
+			return obj.LastSuccessAt, nil
+		},
+		nil,
+		ec.marshalOTime2ᚖtimeᚐTime,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ModelFailoverRuntimeStatus_lastSuccessAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelFailoverRuntimeStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelFailoverRuntimeStatus_nextProbeAt(ctx context.Context, field graphql.CollectedField, obj *ModelFailoverRuntimeStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ModelFailoverRuntimeStatus_nextProbeAt,
+		func(ctx context.Context) (any, error) {
+			return obj.NextProbeAt, nil
+		},
+		nil,
+		ec.marshalOTime2ᚖtimeᚐTime,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ModelFailoverRuntimeStatus_nextProbeAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelFailoverRuntimeStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ModelIDAssociation_modelId(ctx context.Context, field graphql.CollectedField, obj *objects.ModelIDAssociation) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -46760,8 +47324,57 @@ func (ec *executionContext) fieldContext_Query_retryPolicy(_ context.Context, fi
 				return ec.fieldContext_RetryPolicy_emptyResponseDetection(ctx, field)
 			case "upstreamErrorPolicy":
 				return ec.fieldContext_RetryPolicy_upstreamErrorPolicy(ctx, field)
+			case "modelFailover":
+				return ec.fieldContext_RetryPolicy_modelFailover(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RetryPolicy", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_modelFailoverStatuses(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_modelFailoverStatuses,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().ModelFailoverStatuses(ctx)
+		},
+		nil,
+		ec.marshalNModelFailoverRuntimeStatus2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋgqlᚐModelFailoverRuntimeStatusᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_modelFailoverStatuses(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "channelID":
+				return ec.fieldContext_ModelFailoverRuntimeStatus_channelID(ctx, field)
+			case "channelName":
+				return ec.fieldContext_ModelFailoverRuntimeStatus_channelName(ctx, field)
+			case "modelID":
+				return ec.fieldContext_ModelFailoverRuntimeStatus_modelID(ctx, field)
+			case "state":
+				return ec.fieldContext_ModelFailoverRuntimeStatus_state(ctx, field)
+			case "consecutiveFailures":
+				return ec.fieldContext_ModelFailoverRuntimeStatus_consecutiveFailures(ctx, field)
+			case "lastFailureAt":
+				return ec.fieldContext_ModelFailoverRuntimeStatus_lastFailureAt(ctx, field)
+			case "lastSuccessAt":
+				return ec.fieldContext_ModelFailoverRuntimeStatus_lastSuccessAt(ctx, field)
+			case "nextProbeAt":
+				return ec.fieldContext_ModelFailoverRuntimeStatus_nextProbeAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ModelFailoverRuntimeStatus", field.Name)
 		},
 	}
 	return fc, nil
@@ -51614,6 +52227,51 @@ func (ec *executionContext) fieldContext_RetryPolicy_upstreamErrorPolicy(_ conte
 				return ec.fieldContext_UpstreamErrorPolicy_customMessage(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type UpstreamErrorPolicy", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RetryPolicy_modelFailover(ctx context.Context, field graphql.CollectedField, obj *biz.RetryPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RetryPolicy_modelFailover,
+		func(ctx context.Context) (any, error) {
+			return obj.ModelFailover, nil
+		},
+		nil,
+		ec.marshalNModelFailoverPolicy2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐModelFailoverPolicy,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_RetryPolicy_modelFailover(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RetryPolicy",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "enabled":
+				return ec.fieldContext_ModelFailoverPolicy_enabled(ctx, field)
+			case "halfOpenThreshold":
+				return ec.fieldContext_ModelFailoverPolicy_halfOpenThreshold(ctx, field)
+			case "openThreshold":
+				return ec.fieldContext_ModelFailoverPolicy_openThreshold(ctx, field)
+			case "failureStatsTTLSeconds":
+				return ec.fieldContext_ModelFailoverPolicy_failureStatsTTLSeconds(ctx, field)
+			case "probeIntervalSeconds":
+				return ec.fieldContext_ModelFailoverPolicy_probeIntervalSeconds(ctx, field)
+			case "halfOpenWeight":
+				return ec.fieldContext_ModelFailoverPolicy_halfOpenWeight(ctx, field)
+			case "reserveFallbackPriorities":
+				return ec.fieldContext_ModelFailoverPolicy_reserveFallbackPriorities(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ModelFailoverPolicy", field.Name)
 		},
 	}
 	return fc, nil
@@ -73309,6 +73967,75 @@ func (ec *executionContext) unmarshalInputModelCardReasoningInput(ctx context.Co
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputModelFailoverPolicyInput(ctx context.Context, obj any) (biz.ModelFailoverPolicy, error) {
+	var it biz.ModelFailoverPolicy
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"enabled", "halfOpenThreshold", "openThreshold", "failureStatsTTLSeconds", "probeIntervalSeconds", "halfOpenWeight", "reserveFallbackPriorities"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "enabled":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("enabled"))
+			data, err := ec.unmarshalOBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Enabled = data
+		case "halfOpenThreshold":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("halfOpenThreshold"))
+			data, err := ec.unmarshalOInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.HalfOpenThreshold = data
+		case "openThreshold":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("openThreshold"))
+			data, err := ec.unmarshalOInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OpenThreshold = data
+		case "failureStatsTTLSeconds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("failureStatsTTLSeconds"))
+			data, err := ec.unmarshalOInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.FailureStatsTTLSeconds = data
+		case "probeIntervalSeconds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("probeIntervalSeconds"))
+			data, err := ec.unmarshalOInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ProbeIntervalSeconds = data
+		case "halfOpenWeight":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("halfOpenWeight"))
+			data, err := ec.unmarshalOFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.HalfOpenWeight = data
+		case "reserveFallbackPriorities":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reserveFallbackPriorities"))
+			data, err := ec.unmarshalOInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ReserveFallbackPriorities = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputModelIDAssociationInput(ctx context.Context, obj any) (objects.ModelIDAssociation, error) {
 	var it objects.ModelIDAssociation
 	asMap := map[string]any{}
@@ -86220,7 +86947,7 @@ func (ec *executionContext) unmarshalInputUpdateRetryPolicyInput(ctx context.Con
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"maxChannelRetries", "maxSingleChannelRetries", "retryDelayMs", "streamFirstEventTimeoutSeconds", "nonStreamResponseTimeoutSeconds", "loadBalancerStrategy", "traceStickyMode", "enabled", "autoDisableChannel", "emptyResponseDetection", "upstreamErrorPolicy"}
+	fieldsInOrder := [...]string{"maxChannelRetries", "maxSingleChannelRetries", "retryDelayMs", "streamFirstEventTimeoutSeconds", "nonStreamResponseTimeoutSeconds", "loadBalancerStrategy", "traceStickyMode", "enabled", "autoDisableChannel", "emptyResponseDetection", "upstreamErrorPolicy", "modelFailover"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -86304,6 +87031,13 @@ func (ec *executionContext) unmarshalInputUpdateRetryPolicyInput(ctx context.Con
 				return it, err
 			}
 			it.UpstreamErrorPolicy = data
+		case "modelFailover":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("modelFailover"))
+			data, err := ec.unmarshalOModelFailoverPolicyInput2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐModelFailoverPolicy(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ModelFailover = data
 		}
 	}
 
@@ -97841,6 +98575,140 @@ func (ec *executionContext) _ModelEdge(ctx context.Context, sel ast.SelectionSet
 	return out
 }
 
+var modelFailoverPolicyImplementors = []string{"ModelFailoverPolicy"}
+
+func (ec *executionContext) _ModelFailoverPolicy(ctx context.Context, sel ast.SelectionSet, obj *biz.ModelFailoverPolicy) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, modelFailoverPolicyImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ModelFailoverPolicy")
+		case "enabled":
+			out.Values[i] = ec._ModelFailoverPolicy_enabled(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "halfOpenThreshold":
+			out.Values[i] = ec._ModelFailoverPolicy_halfOpenThreshold(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "openThreshold":
+			out.Values[i] = ec._ModelFailoverPolicy_openThreshold(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "failureStatsTTLSeconds":
+			out.Values[i] = ec._ModelFailoverPolicy_failureStatsTTLSeconds(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "probeIntervalSeconds":
+			out.Values[i] = ec._ModelFailoverPolicy_probeIntervalSeconds(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "halfOpenWeight":
+			out.Values[i] = ec._ModelFailoverPolicy_halfOpenWeight(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "reserveFallbackPriorities":
+			out.Values[i] = ec._ModelFailoverPolicy_reserveFallbackPriorities(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var modelFailoverRuntimeStatusImplementors = []string{"ModelFailoverRuntimeStatus"}
+
+func (ec *executionContext) _ModelFailoverRuntimeStatus(ctx context.Context, sel ast.SelectionSet, obj *ModelFailoverRuntimeStatus) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, modelFailoverRuntimeStatusImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ModelFailoverRuntimeStatus")
+		case "channelID":
+			out.Values[i] = ec._ModelFailoverRuntimeStatus_channelID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "channelName":
+			out.Values[i] = ec._ModelFailoverRuntimeStatus_channelName(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "modelID":
+			out.Values[i] = ec._ModelFailoverRuntimeStatus_modelID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "state":
+			out.Values[i] = ec._ModelFailoverRuntimeStatus_state(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "consecutiveFailures":
+			out.Values[i] = ec._ModelFailoverRuntimeStatus_consecutiveFailures(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lastFailureAt":
+			out.Values[i] = ec._ModelFailoverRuntimeStatus_lastFailureAt(ctx, field, obj)
+		case "lastSuccessAt":
+			out.Values[i] = ec._ModelFailoverRuntimeStatus_lastSuccessAt(ctx, field, obj)
+		case "nextProbeAt":
+			out.Values[i] = ec._ModelFailoverRuntimeStatus_nextProbeAt(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var modelIDAssociationImplementors = []string{"ModelIDAssociation"}
 
 func (ec *executionContext) _ModelIDAssociation(ctx context.Context, sel ast.SelectionSet, obj *objects.ModelIDAssociation) graphql.Marshaler {
@@ -103147,6 +104015,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "modelFailoverStatuses":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_modelFailoverStatuses(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "webhookNotifierConfig":
 			field := field
 
@@ -105480,6 +106370,11 @@ func (ec *executionContext) _RetryPolicy(ctx context.Context, sel ast.SelectionS
 			}
 		case "upstreamErrorPolicy":
 			out.Values[i] = ec._RetryPolicy_upstreamErrorPolicy(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "modelFailover":
+			out.Values[i] = ec._RetryPolicy_modelFailover(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -114232,6 +115127,70 @@ func (ec *executionContext) marshalNModelConnection2ᚖgithubᚗcomᚋloopljᚋa
 	return ec._ModelConnection(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNModelFailoverPolicy2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐModelFailoverPolicy(ctx context.Context, sel ast.SelectionSet, v *biz.ModelFailoverPolicy) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ModelFailoverPolicy(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNModelFailoverRuntimeStatus2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋgqlᚐModelFailoverRuntimeStatusᚄ(ctx context.Context, sel ast.SelectionSet, v []*ModelFailoverRuntimeStatus) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNModelFailoverRuntimeStatus2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋgqlᚐModelFailoverRuntimeStatus(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNModelFailoverRuntimeStatus2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋgqlᚐModelFailoverRuntimeStatus(ctx context.Context, sel ast.SelectionSet, v *ModelFailoverRuntimeStatus) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ModelFailoverRuntimeStatus(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNModelIdentify2ᚕᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐModelIdentifyᚄ(ctx context.Context, sel ast.SelectionSet, v []*biz.ModelIdentify) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -120715,6 +121674,14 @@ func (ec *executionContext) marshalOModelEdge2ᚖgithubᚗcomᚋloopljᚋaxonhub
 		return graphql.Null
 	}
 	return ec._ModelEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOModelFailoverPolicyInput2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋserverᚋbizᚐModelFailoverPolicy(ctx context.Context, v any) (*biz.ModelFailoverPolicy, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputModelFailoverPolicyInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalOModelIDAssociation2ᚖgithubᚗcomᚋloopljᚋaxonhubᚋinternalᚋobjectsᚐModelIDAssociation(ctx context.Context, sel ast.SelectionSet, v *objects.ModelIDAssociation) graphql.Marshaler {

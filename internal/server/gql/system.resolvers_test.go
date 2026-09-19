@@ -14,6 +14,7 @@ import (
 	"github.com/looplj/axonhub/internal/objects"
 	"github.com/looplj/axonhub/internal/pkg/xcache"
 	"github.com/looplj/axonhub/internal/server/biz"
+	"github.com/looplj/axonhub/internal/server/orchestrator"
 )
 
 func setupTestSystemMutationResolver(t *testing.T) (*mutationResolver, context.Context, *ent.Client) {
@@ -30,6 +31,24 @@ func setupTestSystemMutationResolver(t *testing.T) (*mutationResolver, context.C
 
 	resolver := &mutationResolver{&Resolver{systemService: systemService}}
 	return resolver, ctx, client
+}
+
+func TestQueryResolver_ModelFailoverStatusesReturnsActiveModels(t *testing.T) {
+	selector := orchestrator.NewDefaultSelector(nil, nil, nil)
+	breaker := selector.ModelCircuitBreaker()
+	for range biz.DefaultModelCircuitBreakerPolicy().HalfOpenThreshold {
+		breaker.RecordError(t.Context(), 42, "provider-model", false)
+	}
+
+	resolver := &queryResolver{&Resolver{defaultSelector: selector}}
+	statuses, err := resolver.ModelFailoverStatuses(t.Context())
+	require.NoError(t, err)
+	require.Len(t, statuses, 1)
+	require.Equal(t, 42, statuses[0].ChannelID)
+	require.Equal(t, "provider-model", statuses[0].ModelID)
+	require.Equal(t, string(biz.StateHalfOpen), statuses[0].State)
+	require.Equal(t, biz.DefaultModelCircuitBreakerPolicy().HalfOpenThreshold, statuses[0].ConsecutiveFailures)
+	require.NotNil(t, statuses[0].LastFailureAt)
 }
 
 func TestMutationResolver_UpdateSystemChannelSettings_MergesAutoSyncWithoutOverwritingProbe(t *testing.T) {

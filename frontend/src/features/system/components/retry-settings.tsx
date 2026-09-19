@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useRetryPolicy, useUpdateRetryPolicy, type RetryPolicyInput } from '../data/system';
+import { ModelFailoverStatus } from './model-failover-status';
 
 export function RetrySettings() {
   const { t } = useTranslation();
@@ -31,6 +32,15 @@ export function RetrySettings() {
     upstreamErrorPolicy: {
       mode: 'passthrough',
       customMessage: '',
+    },
+    modelFailover: {
+      enabled: true,
+      halfOpenThreshold: 3,
+      openThreshold: 5,
+      failureStatsTTLSeconds: 1800,
+      probeIntervalSeconds: 300,
+      halfOpenWeight: 0.3,
+      reserveFallbackPriorities: 1,
     },
     autoDisableChannel: {
       enabled: false,
@@ -54,6 +64,7 @@ export function RetrySettings() {
           mode: retryPolicy.upstreamErrorPolicy?.mode || 'passthrough',
           customMessage: retryPolicy.upstreamErrorPolicy?.customMessage || '',
         },
+        modelFailover: retryPolicy.modelFailover,
         autoDisableChannel: {
           enabled: retryPolicy.autoDisableChannel?.enabled || false,
           statuses: retryPolicy.autoDisableChannel?.statuses || [],
@@ -84,6 +95,16 @@ export function RetrySettings() {
       ...prev,
       autoDisableChannel: {
         ...prev.autoDisableChannel,
+        [field]: value,
+      },
+    }));
+  }, []);
+
+  const handleModelFailoverChange = useCallback((field: keyof NonNullable<RetryPolicyInput['modelFailover']>, value: boolean | number) => {
+    setFormData((prev) => ({
+      ...prev,
+      modelFailover: {
+        ...prev.modelFailover,
         [field]: value,
       },
     }));
@@ -226,7 +247,9 @@ export function RetrySettings() {
                         <SelectValue placeholder={t('system.retry.traceStickyMode.placeholder')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value='PREFER_PREVIOUS_CHANNEL'>{t('system.retry.traceStickyMode.options.preferPreviousChannel')}</SelectItem>
+                        <SelectItem value='PREFER_PREVIOUS_CHANNEL'>
+                          {t('system.retry.traceStickyMode.options.preferPreviousChannel')}
+                        </SelectItem>
                         <SelectItem value='DISABLED'>{t('system.retry.traceStickyMode.options.disabled')}</SelectItem>
                       </SelectContent>
                     </Select>
@@ -238,6 +261,57 @@ export function RetrySettings() {
                     <div className='text-muted-foreground text-xs leading-relaxed'>
                       {t(`system.retry.loadBalancerStrategy.documentation.${formData.loadBalancerStrategy}`)}
                     </div>
+                  </div>
+                )}
+
+                {formData.loadBalancerStrategy === 'round-robin' && (
+                  <div className='space-y-4 rounded-md border p-4'>
+                    <div className='flex items-center justify-between'>
+                      <div className='space-y-0.5'>
+                        <Label htmlFor='model-failover-enabled' className='text-base'>
+                          {t('system.retry.modelFailover.label')}
+                        </Label>
+                        <div className='text-muted-foreground text-sm'>{t('system.retry.modelFailover.description')}</div>
+                      </div>
+                      <Switch
+                        id='model-failover-enabled'
+                        checked={formData.modelFailover?.enabled ?? true}
+                        onCheckedChange={(checked) => handleModelFailoverChange('enabled', checked)}
+                      />
+                    </div>
+
+                    {formData.modelFailover?.enabled && (
+                      <div className='space-y-4'>
+                        <div className='grid gap-4 md:grid-cols-2'>
+                          {(
+                            [
+                              ['halfOpenThreshold', 1, 100, 1],
+                              ['openThreshold', 1, 100, 1],
+                              ['failureStatsTTLSeconds', 1, 86400, 1],
+                              ['probeIntervalSeconds', 1, 86400, 1],
+                              ['halfOpenWeight', 0.1, 1, 0.1],
+                              ['reserveFallbackPriorities', 0, 10, 1],
+                            ] as const
+                          ).map(([field, min, max, step]) => (
+                            <div key={field} className='space-y-2'>
+                              <Label htmlFor={`model-failover-${field}`}>{t(`system.retry.modelFailover.${field}.label`)}</Label>
+                              <div className='text-muted-foreground text-sm'>{t(`system.retry.modelFailover.${field}.description`)}</div>
+                              <Input
+                                id={`model-failover-${field}`}
+                                type='number'
+                                min={min}
+                                max={max}
+                                step={step}
+                                value={formData.modelFailover?.[field] ?? 0}
+                                onChange={(e) => handleModelFailoverChange(field, Number(e.target.value))}
+                                className='w-32'
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <ModelFailoverStatus />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -44,8 +44,9 @@ func NewChatCompletionOrchestrator(
 		channelLimiterMetrics = nil
 	}
 
-	// Initialize model circuit breaker
-	modelCircuitBreaker := biz.NewModelCircuitBreaker()
+	// Model failover runtime is shared by all API-compatible orchestrators.
+	modelCircuitBreaker := defaultSelector.ModelCircuitBreaker()
+	modelFailoverMetrics := defaultSelector.ModelFailoverMetrics()
 
 	rateLimitStrategy := NewRateLimitAwareStrategy(rateLimitTracker, channelLimiterManager)
 
@@ -65,7 +66,8 @@ func NewChatCompletionOrchestrator(
 	roundRobinHealthFilter := NewRoundRobinHealthStrategy(channelService)
 	roundRobinLoadBalancer := NewLoadBalancer(systemService, channelService,
 		rateLimitStrategy,
-	).WithoutWeightTieBreaker().WithRoundRobinHealthFilter(roundRobinHealthFilter).WithStrictRoundRobin()
+	).WithoutWeightTieBreaker().WithRoundRobinHealthFilter(roundRobinHealthFilter).WithStrictRoundRobin().
+		WithModelFailoverHealth(modelCircuitBreaker).WithModelFailoverMetrics(modelFailoverMetrics)
 
 	return &ChatCompletionOrchestrator{
 		Inbound:            inbound,
@@ -86,6 +88,7 @@ func NewChatCompletionOrchestrator(
 		channelSelector:            defaultSelector,
 		channelLimiterManager:      channelLimiterManager,
 		channelLimiterMetrics:      channelLimiterMetrics,
+		modelFailoverMetrics:       modelFailoverMetrics,
 		rateLimitTracker:           rateLimitTracker,
 		adaptiveLoadBalancer:       adaptiveLoadBalancer,
 		failoverLoadBalancer:       failoverLoadBalancer,
@@ -127,6 +130,8 @@ type ChatCompletionOrchestrator struct {
 	// channelLimiterMetrics emits OTel metrics for the limiter (gauges + counters
 	// + histogram). May be nil in test setups that skip metric registration.
 	channelLimiterMetrics *ChannelLimiterMetrics
+	// modelFailoverMetrics emits circuit state, probe, and priority reorder metrics.
+	modelFailoverMetrics *ModelFailoverMetrics
 	// The rate limit tracker for rate limit aware load balancing.
 	rateLimitTracker *ChannelRequestTracker
 	// The model circuit breaker for circuit-breaker load balancing.
